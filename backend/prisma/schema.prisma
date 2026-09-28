@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// USER
+// ==========================================
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  isActive     Boolean @default(true)
+
+  memberships Membership[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// ORGANIZATION
+// ==========================================
+
+model Organization {
+  id     String @id @default(uuid())
+  name   String
+  status String @default("ACTIVE")
+
+  memberships Membership[]
+  projects    Project[]
+  bidders     Bidder[]
+  invitations Invitation[]
+  documents   Document[]
+  bids        Bid[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// MEMBERSHIP
+// ==========================================
+
+model Membership {
+  id             String @id @default(uuid())
+  userId         String
+  organizationId String
+  role           String
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, organizationId])
+}
+
+// ==========================================
+// PROJECT
+// ==========================================
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  location       String?
+  status         ProjectStatus @default(DRAFT)
+  startDate      DateTime?
+  bidDeadline    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bidPackages  BidPackage[]
+  documents    Document[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// ==========================================
+// BID PACKAGE
+// ==========================================
+
+model BidPackage {
+  id          String           @id @default(uuid())
+  projectId   String
+  name        String
+  description String?
+  status      BidPackageStatus @default(DRAFT)
+  bidDeadline DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project      @relation(fields: [projectId], references: [id])
+  invitations Invitation[]
+  bids        Bid[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+// ==========================================
+// BIDDER / VENDOR
+// ==========================================
+
+model Bidder {
+  id             String       @id @default(uuid())
+  organizationId String
+  companyName    String
+  contactName    String?
+  email          String
+  phone          String?
+  address        String?
+  website        String?
+  notes          String?
+  status         BidderStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  invitations  Invitation[]
+  bids         Bid[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// ==========================================
+// INVITATION
+// ==========================================
+
+model Invitation {
+  id String @id @default(uuid())
+
+  organizationId String
+  bidPackageId   String
+  bidderId       String
+
+  email String
+  token String @unique
+
+  status InvitationStatus @default(PENDING)
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  declinedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bidPackage   BidPackage   @relation(fields: [bidPackageId], references: [id])
+  bidder       Bidder       @relation(fields: [bidderId], references: [id])
+
+  @@index([organizationId])
+  @@index([bidPackageId])
+  @@index([bidderId])
+  @@index([email])
+  @@index([status])
+}
+
+// ==========================================
+// DOCUMENT
+// ==========================================
+
+model Document {
+  id             String @id @default(uuid())
+  organizationId String
+  projectId      String
+
+  name         String
+  originalName String
+  fileUrl      String
+  fileType     String?
+  fileSize     Int?
+
+  category DocumentCategory @default(OTHER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  project      Project      @relation(fields: [projectId], references: [id])
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([category])
+}
+
+// ==========================================
+// BID
+// ==========================================
+
+model Bid {
+  id String @id @default(uuid())
+
+  organizationId String
+  bidPackageId   String
+  bidderId       String
+
+  amount Decimal?
+  notes  String?
+
+  status BidStatus @default(DRAFT)
+
+  submittedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bidPackage   BidPackage   @relation(fields: [bidPackageId], references: [id])
+  bidder       Bidder       @relation(fields: [bidderId], references: [id])
+
+  @@index([organizationId])
+  @@index([bidPackageId])
+  @@index([bidderId])
+  @@index([status])
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum ProjectStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum BidPackageStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum BidderStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+}
+
+enum DocumentCategory {
+  DRAWING
+  SPECIFICATION
+  ADDENDUM
+  BID_DOCUMENT
+  OTHER
+}
+
+enum BidStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  AWARDED
+  REJECTED
+  WITHDRAWN
+}
